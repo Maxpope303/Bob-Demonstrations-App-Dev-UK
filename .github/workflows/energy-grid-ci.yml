@@ -1,0 +1,108 @@
+name: Energy Grid Backend — CI
+
+on:
+  push:
+    branches: [ "main", "migration/**" ]
+    paths:
+      - "demo/gap-analysis/implementation/backend/**"
+      - ".github/workflows/energy-grid-ci.yml"
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - "demo/gap-analysis/implementation/backend/**"
+      - ".github/workflows/energy-grid-ci.yml"
+
+jobs:
+  # ── Build & Test ────────────────────────────────────────────────────────────
+  build:
+    name: Build & Test (Java 21 / Quarkus)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Build (skip tests)
+        working-directory: demo/gap-analysis/implementation/backend
+        run: mvn clean compile -DskipTests -B
+
+      - name: Run tests
+        working-directory: demo/gap-analysis/implementation/backend
+        run: mvn test -B
+
+      - name: Package (JVM mode)
+        working-directory: demo/gap-analysis/implementation/backend
+        run: mvn package -DskipTests -B
+
+      - name: Upload JAR artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: energy-grid-backend-jvm
+          path: demo/gap-analysis/implementation/backend/target/quarkus-app/
+          retention-days: 7
+
+  # ── Spring Dep Guard ────────────────────────────────────────────────────────
+  # Fails the build if any live Spring Boot dependency sneaks back in.
+  # (Spring compat extension transitive deps are allowed — only direct org.springframework.boot is blocked)
+  spring-dep-guard:
+    name: Guard — No Spring Boot direct deps
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check pom.xml for Spring Boot starters
+        working-directory: demo/gap-analysis/implementation/backend
+        run: |
+          if grep -E "<groupId>org\.springframework\.boot</groupId>" pom.xml; then
+            echo "❌ Spring Boot direct dependency detected in pom.xml!"
+            exit 1
+          else
+            echo "✅ No Spring Boot direct dependencies found."
+          fi
+
+      - name: Check pom.xml for Quarkus BOM
+        working-directory: demo/gap-analysis/implementation/backend
+        run: |
+          if grep -q "quarkus-bom" pom.xml; then
+            echo "✅ Quarkus BOM present."
+          else
+            echo "❌ Quarkus BOM not found in pom.xml!"
+            exit 1
+          fi
+
+  # ── Native build (optional, triggered manually or on tags) ─────────────────
+  native:
+    name: Native Build (GraalVM)
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up GraalVM 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: graalvm
+          java-version: "21"
+          cache: maven
+
+      - name: Native compile
+        working-directory: demo/gap-analysis/implementation/backend
+        run: mvn package -Pnative -DskipTests -B
+
+      - name: Upload native binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: energy-grid-backend-native
+          path: demo/gap-analysis/implementation/backend/target/*-runner
+          retention-days: 7

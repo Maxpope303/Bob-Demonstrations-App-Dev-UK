@@ -11,60 +11,92 @@
     <packaging>jar</packaging>
 
     <name>Energy Grid Backend</name>
-    <description>Backend services for Energy Grid System</description>
-
-    <parent>
-        <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-starter-parent</artifactId>
-        <version>2.7.0</version>
-    </parent>
+    <description>Backend services for Energy Grid System — migrated from Spring Boot to Quarkus (Spring Compatibility strategy)</description>
 
     <properties>
-        <java.version>11</java.version>
+        <java.version>21</java.version>
+        <maven.compiler.release>21</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <quarkus.platform.group-id>io.quarkus.platform</quarkus.platform.group-id>
+        <quarkus.platform.artifact-id>quarkus-bom</quarkus.platform.artifact-id>
+        <quarkus.platform.version>3.15.1</quarkus.platform.version>
     </properties>
 
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>${quarkus.platform.group-id}</groupId>
+                <artifactId>${quarkus.platform.artifact-id}</artifactId>
+                <version>${quarkus.platform.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
     <dependencies>
-        <!-- Spring Boot Starter Web -->
+        <!-- Spring Compat: Web (replaces spring-boot-starter-web) -->
+        <!-- quarkus-spring-web requires a RESTEasy Jackson runtime -->
         <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-web</artifactId>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-spring-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-rest-jackson</artifactId>
         </dependency>
 
-        <!-- DISCREPANCY #1: Using JPA instead of Hibernate directly -->
-        <!-- Design specifies Hibernate ORM, but implementation uses generic JPA -->
+        <!-- Health (replaces Spring Actuator /actuator/health → /q/health) -->
         <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-data-jpa</artifactId>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-smallrye-health</artifactId>
         </dependency>
 
-        <!-- DISCREPANCY #2: Using MongoDB instead of relational database -->
-        <!-- Design specifies relational database, but implementation uses NoSQL -->
+        <!-- Spring Compat: DI (replaces Spring's DI layer) -->
         <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-data-mongodb</artifactId>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-spring-di</artifactId>
         </dependency>
 
-        <!-- DISCREPANCY #3: Missing Auth0 dependency -->
-        <!-- Design specifies Auth0 for authentication, but no dependency present -->
-        
-        <!-- Spring Security - but not Auth0 -->
+        <!-- Spring Compat: Data JPA (replaces spring-boot-starter-data-jpa) -->
+        <!-- DISCREPANCY #1 preserved: using JPA instead of Hibernate directly -->
         <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-security</artifactId>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-spring-data-jpa</artifactId>
+        </dependency>
+
+        <!-- Full Quarkus: MongoDB Panache (replaces spring-boot-starter-data-mongodb) -->
+        <!-- No Spring compat extension exists for Spring Data MongoDB -->
+        <!-- DISCREPANCY #2 preserved: NoSQL MongoDB alongside relational JPA -->
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-mongodb-panache</artifactId>
+        </dependency>
+
+        <!-- Spring Compat: Security (replaces spring-boot-starter-security) -->
+        <!-- DISCREPANCY #3 preserved: basic security, not Auth0/OAuth2/OIDC -->
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-spring-security</artifactId>
         </dependency>
 
         <!-- Lombok -->
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
-            <optional>true</optional>
+            <version>1.18.34</version>
+            <scope>provided</scope>
         </dependency>
 
         <!-- Testing -->
         <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-test</artifactId>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-junit5</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.rest-assured</groupId>
+            <artifactId>rest-assured</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>
@@ -72,8 +104,27 @@
     <build>
         <plugins>
             <plugin>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-maven-plugin</artifactId>
+                <groupId>${quarkus.platform.group-id}</groupId>
+                <artifactId>quarkus-maven-plugin</artifactId>
+                <version>${quarkus.platform.version}</version>
+                <extensions>true</extensions>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>build</goal>
+                            <goal>generate-code</goal>
+                            <goal>generate-code-tests</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.13.0</version>
+                <configuration>
+                    <release>21</release>
+                </configuration>
             </plugin>
         </plugins>
     </build>
